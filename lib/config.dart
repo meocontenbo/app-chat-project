@@ -8,6 +8,9 @@ class AppConfig {
   static const productionApiUrl = 'https://chat.langlachill.net/api';
   static const _override = String.fromEnvironment('API_URL');
 
+  /// Set by build-ios/build_ipa.sh when the app is built with the screen-share Broadcast Extension.
+  static const iosBroadcastExtension = bool.fromEnvironment('IOS_BROADCAST_EXTENSION');
+
   static String get apiUrl {
     if (_override.isNotEmpty) return _override;
     if (kIsWeb) {

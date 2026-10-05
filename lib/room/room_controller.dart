@@ -6,6 +6,7 @@ import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:livekit_client/livekit_client.dart';
 
+import '../config.dart';
 import '../models/room_info.dart';
 import '../services/api_client.dart';
 import '../services/room_api.dart';
@@ -62,8 +63,12 @@ class RoomController extends ChangeNotifier {
   bool get cameraOn => local?.isCameraEnabled() ?? false;
   bool get screenShareOn => local?.isScreenShareEnabled() ?? false;
 
-  /// Screen share is unavailable in mobile browsers.
-  bool get canScreenShare => !lkPlatformIsWebMobile();
+  /// Mobile browsers can't share the screen; iOS needs the Broadcast Extension build.
+  bool get canScreenShare {
+    if (lkPlatformIsWebMobile()) return false;
+    if (lkPlatformIs(PlatformType.iOS)) return AppConfig.iosBroadcastExtension;
+    return true;
+  }
 
   List<Participant> get participants => [
         if (local != null) local!,
@@ -90,7 +95,11 @@ class RoomController extends ChangeNotifier {
       autoGainControl: true,
     ),
     defaultCameraCaptureOptions: CameraCaptureOptions(params: VideoParametersPresets.h720_169),
-    defaultScreenShareCaptureOptions: ScreenShareCaptureOptions(params: _screenShareParams),
+    // useiOSBroadcastExtension only affects iOS: capture the whole device via the extension.
+    defaultScreenShareCaptureOptions: ScreenShareCaptureOptions(
+      params: _screenShareParams,
+      useiOSBroadcastExtension: true,
+    ),
     defaultVideoPublishOptions: VideoPublishOptions(
       simulcast: true,
       screenShareEncoding: VideoEncoding(maxBitrate: 5000 * 1000, maxFramerate: 30),
@@ -235,6 +244,12 @@ class RoomController extends ChangeNotifier {
           ScreenShareCaptureOptions(sourceId: sourceId, maxFrameRate: 30, params: _screenShareParams),
         );
         await lp.publishVideoTrack(track);
+        return;
+      }
+      if (lkPlatformIs(PlatformType.iOS)) {
+        // Opens the system broadcast picker; LiveKit publishes the track once the user taps
+        // "Start Broadcast" and unpublishes it when the broadcast stops.
+        await lp.setScreenShareEnabled(true);
         return;
       }
       if (lkPlatformIs(PlatformType.android)) {
